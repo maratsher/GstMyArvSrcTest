@@ -41,9 +41,11 @@
 GST_DEBUG_CATEGORY_STATIC (gst_my_arv_test_debug_category);
 #define GST_CAT_DEFAULT gst_my_arv_test_debug_category
 
-/* деклорации */
-
+/* функции для работы с камерой */
 static gboolean myarvtest_init_camera (GstMyArvTest *myarvtest);
+
+/* Переопределнные функции класа GstBasesrc */
+
 static void gst_my_arv_test_set_property (GObject * object,
     guint property_id, const GValue * value, GParamSpec * pspec);
 static void gst_my_arv_test_get_property (GObject * object,
@@ -293,7 +295,7 @@ gst_my_arv_test_create (GstPushSrc * push_src, GstBuffer ** buffer)
     if (arv_buffer == NULL)
       goto error;
 
-    /* кладем данные из буффера в массив. каждый пиксель 8 байт */
+    /* кладем данные из буффера в массив */
     buffer_data = (char *) arv_buffer_get_data (arv_buffer, &buffer_size);
     arv_buffer_get_image_region (arv_buffer, NULL, NULL, &width, &height);
     arv_row_stride = width * ARV_PIXEL_FORMAT_BIT_PER_PIXEL (arv_buffer_get_image_pixel_format (arv_buffer)) / 8;
