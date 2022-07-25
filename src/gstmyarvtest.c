@@ -30,13 +30,14 @@
  * </refsect2>
  */
 
-#include "gst/base/gstpushsrc.h"
+#include "gst/gstversion.h"
 #ifdef HAVE_CONFIG_H
 #endif
 
 #include <gst/gst.h>
 #include <gst/base/gstbasesrc.h>
 #include "gstmyarvtest.h"
+#include "gst/base/gstpushsrc.h"
 
 GST_DEBUG_CATEGORY_STATIC (gst_my_arv_test_debug_category);
 #define GST_CAT_DEFAULT gst_my_arv_test_debug_category
@@ -66,7 +67,12 @@ enum
   PROP_0,
   PROP_CAMERA_NAME,
   PROP_CAMERA,
+
 };
+
+// определенение типа нвшего объекта
+G_DEFINE_TYPE (GstMyArvTest, gst_my_arv_test, GST_TYPE_PUSH_SRC);
+
 
 /*  Описание пэдов */
 
@@ -96,24 +102,29 @@ myarvtest_init_camera (GstMyArvTest *myarvtest)
 	return TRUE;
 }
 
+
+// G_DEFINE_TYPE_WITH_CODE (GstMyArvTest, gst_my_arv_test, GST_TYPE_BASE_SRC,
+//   GST_DEBUG_CATEGORY_INIT (gst_my_arv_test_debug_category, "myarvtest", 0,
+//   "debug category for myarvtest element"));
+
 /* Инициализация класса */
-
-G_DEFINE_TYPE_WITH_CODE (GstMyArvTest, gst_my_arv_test, GST_TYPE_BASE_SRC,
-  GST_DEBUG_CATEGORY_INIT (gst_my_arv_test_debug_category, "myarvtest", 0,
-  "debug category for myarvtest element"));
-
 static void
 gst_my_arv_test_class_init (GstMyArvTestClass * klass)
 {
 	GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
-	GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
 	GstBaseSrcClass *gstbasesrc_class = GST_BASE_SRC_CLASS (klass);
 	GstPushSrcClass *gstpushsrc_class = GST_PUSH_SRC_CLASS (klass);
+
+
+  /* переопределнные функции */
+  gobject_class->set_property = GST_DEBUG_FUNCPTR(gst_my_arv_test_set_property);
+  gobject_class->get_property = GST_DEBUG_FUNCPTR(gst_my_arv_test_get_property);
+  gobject_class->finalize = GST_DEBUG_FUNCPTR(gst_my_arv_test_finalize);
 
   g_object_class_install_property
 		(gobject_class,
 		 PROP_CAMERA_NAME,
-		 g_param_spec_string ("camera-name",
+		 g_param_spec_string ("camera_name",
 				      "Имя камеры",
 				      "Введенное пользователем имя камеры",
 				      NULL,
@@ -134,10 +145,6 @@ gst_my_arv_test_class_init (GstMyArvTestClass * klass)
       "FIXME Long name", "Generic", "FIXME Description",
       "FIXME <fixme@example.com>");
 
-  /* переопределнные функции */
-  gobject_class->set_property = gst_my_arv_test_set_property;
-  gobject_class->get_property = gst_my_arv_test_get_property;
-  gobject_class->finalize = gst_my_arv_test_finalize;
   gstbasesrc_class->start = GST_DEBUG_FUNCPTR (gst_my_arv_test_start);
   gstbasesrc_class->stop = GST_DEBUG_FUNCPTR (gst_my_arv_test_stop);
   // ???????
@@ -149,12 +156,13 @@ gst_my_arv_test_class_init (GstMyArvTestClass * klass)
 static void
 gst_my_arv_test_init (GstMyArvTest *myarvtest)
 {
-  gst_base_src_set_live (GST_BASE_SRC (myarvtest), TRUE);
-  // ????
-	gst_base_src_set_format (GST_BASE_SRC (myarvtest), GST_FORMAT_TIME);
+   gst_base_src_set_live (GST_BASE_SRC (myarvtest), TRUE);
+   // ????
+	 gst_base_src_set_format (GST_BASE_SRC (myarvtest), GST_FORMAT_TIME);
 
 	myarvtest->camera_name = NULL;
   myarvtest->camera = NULL;
+  myarvtest->stream = NULL;
 }
 
 /* установка свойств - только имя */
@@ -169,11 +177,13 @@ gst_my_arv_test_set_property (GObject * object, guint property_id,
       case PROP_CAMERA_NAME:
         GST_OBJECT_LOCK (myarvtest);
         g_free (myarvtest->camera_name);
-        /* читаем название камеры и подключаемся к ней */ 
-        myarvtest->camera_name = g_strdup (g_value_get_string (value));
-        myarvtest_init_camera (myarvtest);
+        if(myarvtest->stream == NULL){
+          /* читаем название камеры и подключаемся к ней */ 
+          myarvtest->camera_name = g_strdup (g_value_get_string (value));
+          myarvtest_init_camera (myarvtest);
+        }
 
-        GST_LOG_OBJECT (myarvtest, "Set camera name to %s", myarvtest->camera_name);
+        GST_LOG_OBJECT (myarvtest, "Имя камеры: %s", myarvtest->camera_name);
         GST_OBJECT_UNLOCK (myarvtest);
         break;
 
@@ -190,7 +200,7 @@ gst_my_arv_test_get_property (GObject * object, guint property_id,
 {
   GstMyArvTest *myarvtest = GST_MY_ARV_TEST(object);
 
-	GST_DEBUG_OBJECT (myarvtest, "getting property %s", pspec->name);
+	// GST_DEBUG_OBJECT (myarvtest, "Полечений свойсва %s", pspec->name);
 
 	switch (property_id) {
 		case PROP_CAMERA_NAME:
@@ -213,14 +223,16 @@ gst_my_arv_test_finalize (GObject * object)
 
 	GstMyArvTest *myarvtest = GST_MY_ARV_TEST(object);
 	ArvCamera *camera;
+  ArvStream *stream;
 
 	GST_OBJECT_LOCK (myarvtest);
 	camera = g_steal_pointer (&myarvtest->camera);
+  stream = g_steal_pointer(&myarvtest->stream);
 	g_clear_pointer (&myarvtest->camera_name, g_free);
 	GST_OBJECT_UNLOCK (myarvtest);
 
-	if (camera != NULL)
-		g_object_unref (camera);
+	if (camera != NULL) g_object_unref (camera);
+  if (stream != NULL) g_object_unref (stream);
 
 	G_OBJECT_CLASS (gst_my_arv_test_parent_class)->finalize (object);
 
@@ -233,18 +245,30 @@ gst_my_arv_test_start (GstBaseSrc * src)
 {
   GError *error = NULL;
 	gboolean result = TRUE;
+  size_t payload;
   GstMyArvTest *myarvtest = GST_MY_ARV_TEST (src);
 
 	GST_LOG_OBJECT (myarvtest, "Подключение к камере '%s'", myarvtest->camera_name);
 
 	GST_OBJECT_LOCK (myarvtest);
   // если камеры еще нет, подключаемся к ней
-	if (myarvtest->camera == NULL)
-		result = myarvtest_init_camera (myarvtest);
+	if (myarvtest->camera == NULL){
+    result = myarvtest_init_camera (myarvtest);
+  }
+
+  myarvtest->stream = arv_camera_create_stream (myarvtest->camera, NULL, NULL, &error);
+
+  payload = arv_camera_get_payload (myarvtest->camera, &error);
+	for (int i = 0; i < 50; i++)
+		arv_stream_push_buffer (myarvtest->stream,
+                          arv_buffer_new (payload, NULL));
+
+	GST_LOG_OBJECT (myarvtest, "Запуск потока...");
+	arv_camera_start_acquisition (myarvtest->camera, &error);
 	GST_OBJECT_UNLOCK (myarvtest);
 
   // В случае ошибки с инициализацей камеры
-	// if (error)  result = FALSE;
+	if (error)  result = FALSE;
 
 	return result;
 
@@ -254,11 +278,19 @@ gst_my_arv_test_start (GstBaseSrc * src)
 static gboolean
 gst_my_arv_test_stop (GstBaseSrc * src)
 {
+  GError *error = NULL;
   GstMyArvTest *myarvtest = GST_MY_ARV_TEST (src);
+  ArvStream *stream;
+
+  GST_OBJECT_LOCK (myarvtest);
+	arv_camera_stop_acquisition (myarvtest->camera, &error);
+	stream = g_steal_pointer (&myarvtest->stream);
+	GST_OBJECT_UNLOCK (myarvtest);
+
+	if (stream != NULL)
+		g_object_unref (stream);
 
   GST_DEBUG_OBJECT (myarvtest, "Остоновка потока...");
-	// GST_OBJECT_LOCK (myarvtest);
-	// GST_OBJECT_UNLOCK (myarvtest);
 
 	return TRUE;
 }
@@ -289,8 +321,13 @@ gst_my_arv_test_create (GstPushSrc * push_src, GstBuffer ** buffer)
 
     GST_OBJECT_LOCK (myarvtest);
 
-    /* Читаем в буффер одно изображение */ 
-    arv_buffer = arv_camera_acquisition(myarvtest->camera, 0, &error);
+    // /* Читаем в буффер одно изображение */ 
+    // arv_buffer = arv_camera_acquisition(myarvtest->camera, 0, &error);
+  	do {
+      // начало потока, 
+      if (arv_buffer) arv_stream_push_buffer (myarvtest->stream, arv_buffer);
+      arv_buffer = arv_stream_pop_buffer (myarvtest->stream);
+    } while (arv_buffer != NULL && arv_buffer_get_status (arv_buffer) != ARV_BUFFER_STATUS_SUCCESS);
 
     if (arv_buffer == NULL)
       goto error;
@@ -320,8 +357,9 @@ gst_my_arv_test_create (GstPushSrc * push_src, GstBuffer ** buffer)
     } else {
       *buffer = gst_buffer_new_wrapped_full (0, buffer_data, buffer_size, 0, buffer_size, NULL, NULL);
     }
+    /*=============================*/
 
-
+    arv_stream_push_buffer (myarvtest->stream, arv_buffer);
     GST_OBJECT_UNLOCK (myarvtest);
 
     return GST_FLOW_OK;
@@ -336,30 +374,37 @@ plugin_init (GstPlugin * plugin)
 {
   /* FIXME Remember to set the rank if it's an element that is meant
      to be autoplugged by decodebin. */
-  return gst_element_register (plugin, "myarvtest", GST_RANK_NONE,
+  return gst_element_register (plugin, "myarvsrc", GST_RANK_NONE,
       GST_TYPE_MY_ARV_TEST);
 }
 
-/* FIXME: these are normally defined by the GStreamer build system.
-   If you are creating an element to be included in gst-plugins-*,
-   remove these, as they're always defined.  Otherwise, edit as
-   appropriate for your external plugin package. */
-#ifndef VERSION
-#define VERSION "0.0.FIXME"
-#endif
-#ifndef PACKAGE
-#define PACKAGE "FIXME_package"
-#endif
-#ifndef PACKAGE_NAME
-#define PACKAGE_NAME "FIXME_package_name"
-#endif
-#ifndef GST_PACKAGE_ORIGIN
-#define GST_PACKAGE_ORIGIN "http://FIXME.org/"
-#endif
+// /* FIXME: these are normally defined by the GStreamer build system.
+//    If you are creating an element to be included in gst-plugins-*,
+//    remove these, as they're always defined.  Otherwise, edit as
+//    appropriate for your external plugin package. */
+// #ifndef VERSION
+// #define VERSION "0.0.FIXME"
+// #endif
+// #ifndef PACKAGE
+// #define PACKAGE "FIXME_package"
+// #endif
+// #ifndef PACKAGE_NAME
+// #define PACKAGE_NAME "FIXME_package_name"
+// #endif
+// #ifndef GST_PACKAGE_ORIGIN
+// #define GST_PACKAGE_ORIGIN "http://FIXME.org/"
+// #endif
+
+
+
+#define PACKAGE "myarvsrc"
 
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
-    GST_VERSION_MINOR,
-    myarvtest,
-    "FIXME plugin description",
-    plugin_init, VERSION, "LGPL", PACKAGE_NAME, GST_PACKAGE_ORIGIN)
-
+		   GST_VERSION_MINOR,
+		   myarvsrc,
+		   "Aravis Video Source",
+		   plugin_init,
+		   ARAVIS_VERSION,
+		   "LGPL",
+		   "myarvsrc",
+		   "http://google.com")

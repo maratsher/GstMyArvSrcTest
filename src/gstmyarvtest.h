@@ -38,8 +38,10 @@ typedef struct _GstMyArvTestClass GstMyArvTestClass;
 struct _GstMyArvTest
 {
   GstPushSrc base_myarvtest;
+
   char *camera_name; // имя камеры
   ArvCamera *camera; // укзаатель на объект камеры
+  ArvStream *stream; // указатель на обект потока
 
 };
 
