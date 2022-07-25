@@ -128,7 +128,7 @@ gst_my_arv_test_class_init (GstMyArvTestClass * klass)
 				      "Имя камеры",
 				      "Введенное пользователем имя камеры",
 				      NULL,
-				      G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+				      G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE));
 	g_object_class_install_property
 		(gobject_class,
 		 PROP_CAMERA,
@@ -136,7 +136,7 @@ gst_my_arv_test_class_init (GstMyArvTestClass * klass)
 				      "ArvCamera",
 				      "Объект типа ArvCamera указывающий на камеру",
 				              ARV_TYPE_CAMERA,
-				      G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+				      G_PARAM_READABLE | GST_PARAM_CONTROLLABLE));
 
   gst_element_class_add_static_pad_template (GST_ELEMENT_CLASS(klass),
       &gst_my_arv_test_src_template);
